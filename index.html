@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESR Target Calculator</title>
+
+<style>
+:root{
+    --bg:#f5f7fa;
+    --card:#ffffff;
+    --text:#1f2937;
+    --accent:#2563eb;
+    --border:#d1d5db;
+    --success:#16a34a;
+}
+
+@media (prefers-color-scheme: dark){
+    :root{
+        --bg:#111827;
+        --card:#1f2937;
+        --text:#f3f4f6;
+        --border:#374151;
+        --accent:#60a5fa;
+    }
+}
+
+body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+}
+
+.container{
+    max-width:500px;
+    margin:auto;
+    padding:20px;
+}
+
+.card{
+    background:var(--card);
+    border-radius:16px;
+    padding:20px;
+    box-shadow:0 4px 12px rgba(0,0,0,.08);
+}
+
+h1{
+    text-align:center;
+    margin-top:0;
+}
+
+.input-group{
+    margin-bottom:16px;
+}
+
+label{
+    display:block;
+    margin-bottom:6px;
+    font-weight:600;
+}
+
+input{
+    width:100%;
+    box-sizing:border-box;
+    padding:12px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    font-size:16px;
+}
+
+.result{
+    margin-top:18px;
+}
+
+.row{
+    display:flex;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid var(--border);
+}
+
+.value{
+    font-weight:700;
+}
+
+.target{
+    color:var(--accent);
+}
+
+.range{
+    color:var(--success);
+}
+
+.footer{
+    text-align:center;
+    margin-top:15px;
+    font-size:13px;
+    color:#6b7280;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+
+        <h1>ESR Target Calculator</h1>
+
+        <div class="input-group">
+            <label>Short Side (inch)</label>
+            <input id="shortSide" type="number" value="25" step="0.01">
+        </div>
+
+        <div class="input-group">
+            <label>Long Side (inch)</label>
+            <input id="longSide" type="number" value="24" step="0.01">
+        </div>
+
+        <div class="input-group">
+            <label>Tolerance (±)</label>
+            <input id="tolerance" type="number" value="5" step="0.01">
+        </div>
+
+        <div class="result">
+
+            <div class="row">
+                <span>Target ESR</span>
+                <span id="target" class="value target">0</span>
+            </div>
+
+            <div class="row">
+                <span>Minimum ESR</span>
+                <span id="minimum" class="value range">0</span>
+            </div>
+
+            <div class="row">
+                <span>Maximum ESR</span>
+                <span id="maximum" class="value range">0</span>
+            </div>
+
+            <div class="row">
+                <span>Method</span>
+                <span id="method">Interpolated</span>
+            </div>
+
+        </div>
+
+        <div class="footer">
+            Values between table points are interpolated automatically.
+        </div>
+
+    </div>
+</div>
+
+<script>
+
+const shortSizes=[12,18,24,30,36,42,48,54,60,66,72,78,84];
+
+const longSizes=[30,36,42,48,54,60,66,72,78,84,90,96,102,108,114,120];
+
+const table=[
+[29,39,50,61,null,null,null,null,null,null,null,null,null],
+[25,34,43,52,61,null,null,null,null,null,null,null,null],
+[22,30,38,46,53,61,null,null,null,null,null,null,null],
+[20,27,34,41,48,54,61,null,null,null,null,null,null],
+[19,25,31,37,43,49,55,61,null,null,null,null,null],
+[18,23,29,34,39,45,50,56,61,null,null,null,null],
+[17,22,28,31,36,41,46,51,56,61,null,null,null],
+[16,20,25,29,34,38,43,48,52,57,61,null,null],
+[15,19,23,28,32,36,40,44,49,53,57,61,null],
+[14,18,22,26,30,34,38,42,46,50,53,57,61],
+[14,18,21,25,29,32,36,39,43,47,50,54,58],
+[14,17,20,24,27,31,34,37,41,44,48,51,54],
+[13,16,20,23,26,29,32,36,39,42,45,48,52],
+[13,16,19,22,25,28,31,34,37,40,43,46,49],
+[12,15,18,21,24,27,30,33,35,38,41,44,47],
+[12,15,18,20,23,26,29,31,34,37,39,42,45]
+];
+
+function maxTableValue(){
+    return 61;
+}
+
+function findIndex(value,array){
+
+    if(value<=array[0]) return 0;
+    if(value>=array[array.length-1]) return array.length-2;
+
+    for(let i=0;i<array.length-1;i++){
+        if(value>=array[i] && value<=array[i+1]){
+            return i;
+        }
+    }
+
+    return array.length-2;
+}
+
+function getValue(r,c){
+
+    if(table[r][c]!=null)
+        return table[r][c];
+
+    const s=shortSizes[c];
+    const l=longSizes[r];
+
+    const mirrorRow=longSizes.indexOf(s);
+    const mirrorCol=shortSizes.indexOf(l);
+
+    if(mirrorRow>=0 && mirrorCol>=0)
+        return table[mirrorRow][mirrorCol];
+
+    return 0;
+}
+
+function calculate(){
+
+    let shortVal=parseFloat(
+        document.getElementById("shortSide").value||0
+    );
+
+    let longVal=parseFloat(
+        document.getElementById("longSide").value||0
+    );
+
+    let tolerance=parseFloat(
+        document.getElementById("tolerance").value||0
+    );
+
+    const xs=Math.min(shortVal,longVal);
+    const xl=Math.max(shortVal,longVal);
+
+    const extrapolated=
+        xs<12 || xs>84 ||
+        xl<30 || xl>120;
+
+    const row=findIndex(xl,longSizes);
+    const col=findIndex(xs,shortSizes);
+
+    const loL=longSizes[row];
+    const hiL=longSizes[row+1];
+
+    const loS=shortSizes[col];
+    const hiS=shortSizes[col+1];
+
+    const tl=(xl-loL)/(hiL-loL);
+    const ts=(xs-loS)/(hiS-loS);
+
+    const q11=getValue(row,col);
+    const q12=getValue(row,col+1);
+    const q21=getValue(row+1,col);
+    const q22=getValue(row+1,col+1);
+
+    let target=
+        q11*(1-tl)*(1-ts)+
+        q12*(1-tl)*ts+
+        q21*tl*(1-ts)+
+        q22*tl*ts;
+
+    target=Math.max(0,target);
+    target=Math.min(target,maxTableValue());
+
+    const minimum=Math.max(0,target-tolerance);
+    const maximum=target+tolerance;
+
+    document.getElementById("target").innerText=
+        target.toFixed(2);
+
+    document.getElementById("minimum").innerText=
+        minimum.toFixed(2);
+
+    document.getElementById("maximum").innerText=
+        maximum.toFixed(2);
+
+    document.getElementById("method").innerText=
+        extrapolated
+        ? "Extrapolated"
+        : "Interpolated";
+}
+
+document.querySelectorAll("input")
+.forEach(x=>x.addEventListener("input",calculate));
+
+calculate();
+
+</script>
+
+</body>
+</html>
